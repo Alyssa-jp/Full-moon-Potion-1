@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Potion Aligner</title>
+<style>
+  :root{
+    /* 表示サイズ（必要なら変更OK） */
+    --stage: min(92vw, 520px);
+
+    /* 初期値：動かしながら更新される */
+    --cap-top: 7%;
+    --cap-left: 31%;
+    --cap-width: 27%;
+    --liq-left: 19%;
+    --liq-top: 47%;
+    --liq-width: 62%;
+    --liq-height: 30%;
+  }
+
+  html,body{margin:0;height:100%;background:#0b0f14;display:grid;place-items:center;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .stage{position:relative;width:var(--stage);aspect-ratio:1/1;isolation:isolate;background:#0b0f14}
+  .stage img{user-select:none;pointer-events:none}
+
+  /* 瓶本体（最上） */
+  #Bottle{position:absolute;inset:0;width:100%;height:auto;z-index:3;filter:drop-shadow(0 14px 32px rgba(0,0,0,.45))}
+
+  /* 液体ボックス（ドラッグ対象） */
+  .liq-box{
+    position:absolute;left:var(--liq-left);top:var(--liq-top);
+    width:var(--liq-width);height:var(--liq-height);
+    border:2px dashed rgba(120,180,255,.75);
+    border-radius:26%/22%; z-index:2; box-sizing:border-box;
+    background:linear-gradient(145deg, rgba(40,60,90,.25), transparent);
+    cursor:grab;
+  }
+  .liq-box:active{cursor:grabbing}
+  #Liquid{position:absolute;inset:-6% -6% -6% -6%;width:112%;height:auto;object-fit:cover;opacity:.9;mix-blend-mode:multiply}
+
+  /* 蓋（ドラッグ対象） */
+  #Cap{
+    position:absolute;width:var(--cap-width);left:var(--cap-left);top:var(--cap-top);
+    z-index:4; filter:drop-shadow(0 8px 22px rgba(0,0,0,.5));
+    cursor:grab; outline:2px dashed rgba(255,210,120,.75); outline-offset:4px; border-radius:10px;
+  }
+  #Cap:active{cursor:grabbing}
+
+  /* HUD */
+  .hud{
+    position:fixed;right:12px;bottom:12px;background:#0f1520cc;
+    border:1px solid #2a3648;border-radius:12px;padding:10px 12px;backdrop-filter:blur(6px);
+    min-width:260px; font:12px/1.5 ui-monospace,Menlo,monospace;
+  }
+  .row{display:flex;justify-content:space-between;gap:8px}
+  .btns{display:flex;gap:8px;margin-top:8px}
+  button{background:#161a20;color:#eaf6ff;border:1px solid #2a3648;border-radius:10px;padding:8px 12px;font-weight:600}
+  .hint{opacity:.75;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <!-- 液体（枠内だけに表示） -->
+  <div class="liq-box" id="liqBox">
+    <img id="Liquid" src="Liquid.PNG" alt="liquid">
+  </div>
+
+  <!-- 瓶 -->
+  <img id="Bottle" src="Bottle.PNG" alt="bottle">
+
+  <!-- 蓋 -->
+  <img id="Cap" src="Cap.PNG" alt="cap">
+</div>
+
+<div class="hud" id="hud">
+  <div class="row"><div>cap-left :</div><div id="capL">--</div></div>
+  <div class="row"><div>cap-top  :</div><div id="capT">--</div></div>
+  <div class="row"><div>liq-left :</div><div id="liqL">--</div></div>
+  <div class="row"><div>liq-top  :</div><div id="liqT">--</div></div>
+  <div class="row"><div>liq-width:</div><div id="liqW">--</div></div>
+  <div class="row"><div>liq-height:</div><div id="liqH">--</div></div>
+
+  <div class="btns">
+    <button id="copyBtn">Copy CSS</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+  <div class="hint">ドラッグ：蓋 &amp; 液体枠 / 2本指ピンチ：液体枠のサイズ変更</div>
+</div>
+
+<script>
+/* 基本ユーティリティ */
+const $ = s=>document.querySelector(s);
+const css = (prop,val)=>document.documentElement.style.setProperty(prop,val);
+const fmt = v => (Math.round(v*10)/10).toFixed(1) + '%';
+
+const stage   = $('#stage');
+const cap     = $('#Cap');
+const liqBox  = $('#liqBox');
+
+/* 現在値の表示を更新 */
+function updateHUD(){
+  $('#capL').textContent = getComputedStyle(document.documentElement).getPropertyValue('--cap-left').trim();
+  $('#capT').textContent = getComputedStyle(document.documentElement).getPropertyValue('--cap-top').trim();
+  $('#liqL').textContent = getComputedStyle(document.documentElement).getPropertyValue('--liq-left').trim();
+  $('#liqT').textContent = getComputedStyle(document.documentElement).getPropertyValue('--liq-top').trim();
+  $('#liqW').textContent = getComputedStyle(document.documentElement).getPropertyValue('--liq-width').trim();
+  $('#liqH').textContent = getComputedStyle(document.documentElement).getPropertyValue('--liq-height').trim();
+}
+
+/* ステージ基準の％に変換 */
+function toPercent(x,y){
+  const r = stage.getBoundingClientRect();
+  return { px: ((x-r.left)/r.width)*100, py: ((y-r.top)/r.height)*100 };
+}
+
+/* 汎用ドラッグ（要素左上を基準に移動） */
+function enableDrag(el, onmove){
+  let active=false, sx=0, sy=0, baseL=0, baseT=0;
+  const down = e=>{
+    active=true;
+    const p = (e.touches? e.touches[0]:e);
+    sx=p.clientX; sy=p.clientY;
+    const rect=el.getBoundingClientRect();
+    const st=stage.getBoundingClientRect();
+    baseL=((rect.left-st.left)/st.width)*100;
+    baseT=((rect.top -st.top )/st.height)*100;
+    e.preventDefault();
+  };
+  const move = e=>{
+    if(!active) return;
+    const p = (e.touches? e.touches[0]:e);
+    const st=stage.getBoundingClientRect();
+    const dx = (p.clientX - sx)/st.width*100;
+    const dy = (p.clientY - sy)/st.height*100;
+    onmove(baseL+dx, baseT+dy);
+  };
+  const up=()=>{ active=false; updateHUD(); };
+  el.addEventListener('mousedown',down);  window.addEventListener('mousemove',move);  window.addEventListener('mouseup',up);
+  el.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+}
+
+/* ピンチでサイズ変更（液体枠） */
+function enablePinchResize(box){
+  let touching=false, startDist=0, baseW=0, baseH=0;
+  box.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      touching=true;
+      const [a,b]=e.touches;
+      startDist=Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+      const st=stage.getBoundingClientRect(), r=box.getBoundingClientRect();
+      baseW=(r.width/st.width)*100; baseH=(r.height/st.height)*100;
+    }
+  },{passive:false});
+  window.addEventListener('touchmove',e=>{
+    if(!touching||e.touches.length!==2) return;
+    const [a,b]=e.touches;
+    const dist=Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+    const scale=dist/startDist;
+    css('--liq-width',  fmt(baseW*scale));
+    css('--liq-height', fmt(baseH*scale));
+    updateHUD();
+  },{passive:false});
+  window.addEventListener('touchend',()=>{ touching=false; });
+}
+
+/* それぞれ適用 */
+enableDrag(cap, (L,T)=>{
+  css('--cap-left', fmt(L));
+  css('--cap-top',  fmt(T));
+});
+enableDrag(liqBox, (L,T)=>{
+  css('--liq-left', fmt(L));
+  css('--liq-top',  fmt(T));
+});
+enablePinchResize(liqBox);
+
+/* コピー・リセット */
+$('#copyBtn').onclick=()=>{
+  const txt =
+`--cap-left: ${$('#capL').textContent};
+--cap-top: ${$('#capT').textContent};
+--cap-width: var(--cap-width); /* 幅は必要なら別途編集 */
+
+--liq-left: ${$('#liqL').textContent};
+--liq-top: ${$('#liqT').textContent};
+--liq-width: ${$('#liqW').textContent};
+--liq-height: ${$('#liqH').textContent};`;
+  navigator.clipboard.writeText(txt);
+  $('#copyBtn').textContent='Copied!';
+  setTimeout(()=>$('#copyBtn').textContent='Copy CSS',900);
+};
+$('#resetBtn').onclick=()=>{
+  css('--cap-top','7%'); css('--cap-left','31%'); css('--cap-width','27%');
+  css('--liq-left','19%'); css('--liq-top','47%'); css('--liq-width','62%'); css('--liq-height','30%');
+  updateHUD();
+};
+
+updateHUD();
+</script>
+</body>
+</html>
