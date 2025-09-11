@@ -9,16 +9,23 @@
     /* 全体の表示サイズ（大きさを変えたい時はここだけ） */
     --stage: min(92vw, 520px);
 
-    /* ── 蓋（Cap）の位置と大きさ ───────────────── */
-    --cap-top: 40%;   /* 口に対して上下位置   ↓(+で下/−で上)  */
-    --cap-left: 80.8%; /* 左右位置             →(+で右/−で左) */
-    --cap-width: 60.5%;/* 横幅（％） */
+   :root{
+  --stage: min(92vw, 520px);
 
-    /* ── 瓶の中の液体（Liquid）の入る箱（クリップ枠） ─ */
-    --liq-left: 20%;  /* 左右位置 */
-    --liq-top: 42%;   /* 上下位置 */
-    --liq-width: 65%; /* 幅 */
-    --liq-height: 40%;  /* 高さ */
+  /* 蓋（Cap）*/
+  --cap-top: 8.5%;
+  --cap-left: 34%;
+  --cap-width: 26%;
+
+  /* 液体（Liquid の枠）*/
+  --liq-left: 18.5%;
+  --liq-top: 50%;
+  --liq-width: 63%;
+  --liq-height: 28%;
+
+  --liq-rotate-scale: .7;
+  --debug-outline: 1; /* ← 枠を一時表示 */
+}
 
     /* 倾けた時に液体だけ少し控えめに回す倍率（見た目の調整用） */
     --liq-rotate-scale: .7;
