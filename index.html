@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pisces Eclipse Potion — © ALYSSA</title>
+  <style>
+    :root{
+      --stage: min(92vw, 520px);
+
+      /* Cap（蓋の位置とサイズ） */
+      --cap-top: 6%;
+      --cap-left: 36%;
+      --cap-width: 28%;
+
+      /* Liquid（液体の位置とサイズ） */
+      --liq-left: 18%;
+      --liq-top: 43%;
+      --liq-width: 64%;
+      --liq-height: 36%;
+
+      --liq-rotate-scale: .7;
+    }
+
+    body {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      height: 100vh;
+      background: black;
+    }
+
+    .stage {
+      width: var(--stage);
+      aspect-ratio: 1/1;
+      position: relative;
+    }
+
+    img {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    #cap {
+      top: var(--cap-top);
+      left: var(--cap-left);
+      width: var(--cap-width);
+      height: auto;
+    }
+
+    #liquid {
+      top: var(--liq-top);
+      left: var(--liq-left);
+      width: var(--liq-width);
+      height: var(--liq-height);
+      transform-origin: top center;
+      transition: transform 0.3s;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 5px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <img id="background" src="Background.png" alt="background">
+    <img id="bottle" src="Bottle.png" alt="bottle">
+    <img id="cap" src="Cap.png" alt="cap">
+    <img id="liquid" src="Liquid.png" alt="liquid">
+    <div class="controls">
+      <button onclick="openCap()">Open Cap</button>
+      <button onclick="tiltBottle()">Tilt</button>
+    </div>
+  </div>
+
+  <script>
+    let capOpen = false;
+    let tilted = false;
+
+    function openCap() {
+      const cap = document.getElementById('cap');
+      if (!capOpen) {
+        cap.style.transform = 'translateY(-80%)';
+        capOpen = true;
+      } else {
+        cap.style.transform = 'translateY(0)';
+        capOpen = false;
+      }
+    }
+
+    function tiltBottle() {
+      const liquid = document.getElementById('liquid');
+      if (!tilted) {
+        liquid.style.transform = 'rotate(-40deg) scaleY(var(--liq-rotate-scale))';
+        tilted = true;
+      } else {
+        liquid.style.transform = 'rotate(0deg) scaleY(1)';
+        tilted = false;
+      }
+    }
+  </script>
+</body>
+</html>
