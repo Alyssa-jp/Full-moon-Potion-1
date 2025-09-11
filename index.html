@@ -6,60 +6,49 @@
 <title>Potion — size fit</title>
 <style>
 :root{
+:root{
   --stage: min(92vw, 520px);
 
-  /* 蓋（Cap）の位置とサイズ */
-  --cap-top: 5%;      /* ↑上げたい: 数値小さく / 下げたい: 大きく */
-  --cap-left: 31%;    /* ←左へ: 小さく / 右へ: 大きく */
-  --cap-width: 26%;   /* 蓋の大きさ */
+  /* 蓋（右に寄り過ぎ→左へ寄せる） */
+  --cap-top: 7%;
+  --cap-left: 31%;
+  --cap-width: 27%;
 
-  /* 液体（Liquid）の枠 */
+  /* 液体の枠（少し上げて幅を広げる） */
   --liq-left: 18%;
-  --liq-top: 47%;     /* 高い→小さく / 低い→大きく */
+  --liq-top: 46%;
   --liq-width: 64%;
-  --liq-height: 30%;
-
-  --liq-rotate-scale: .7;
-  --debug-outline: 1; /* ←点線で枠を出して合わせやすく（合ったら0に戻す） */
-}
-  --liq-rotate-scale: .7;
-  --debug-outline: 1; /* ← 枠を一時表示 */
+  --liq-height: 32%;
 }
 
-    /* 倾けた時に液体だけ少し控えめに回す倍率（見た目の調整用） */
-    --liq-rotate-scale: .7;
+/* ……下は重なり順の修正だけ追加 …… */
 
-    /* 作業中だけ枠を見たい時は 1 にする（終わったら 0） */
-    --debug-outline: 0;
-  }
+.stage img.base{
+  position:absolute;inset:0;width:100%;height:auto;
+  user-select:none;pointer-events:none;
+  filter:drop-shadow(0 14px 32px rgba(0,0,0,.45));
+  z-index:2;              /* 瓶は2 */
+}
 
-  html,body{margin:0;height:100%;background:#000;display:grid;place-items:center;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .stage{position:relative;width:var(--stage);aspect-ratio:1/1;isolation:isolate}
+.liq-box{
+  position:absolute;left:var(--liq-left);top:var(--liq-top);
+  width:var(--liq-width);height:var(--liq-height);
+  overflow:hidden;border-radius:26%/22%;
+  z-index:3;              /* 液体は3（＝瓶より上） */
+}
+#Liquid{
+  position:absolute;inset:-6% -6% -6% -6%;
+  width:112%;height:auto;object-fit:cover;
+  transform-origin:50% 60%;transition:transform .2s ease-out;
+}
 
-  /* 画像の基礎スタイル（ボトル本体） */
-  .stage img.base{position:absolute;inset:0;width:100%;height:auto;user-select:none;pointer-events:none;filter:drop-shadow(0 12px 30px rgba(0,0,0,.45))}
-
-  /* 蓋 */
-  #Cap{position:absolute;width:var(--cap-width);left:var(--cap-left);top:var(--cap-top);transition:transform .45s cubic-bezier(.2,.8,.2,1)}
-  .open #Cap{transform:translateY(-60%) rotate(-18deg)}
-
-  /* 液体はクリップ用ボックスの中だけ表示 */
-  .liq-box{
-    position:absolute;left:var(--liq-left);top:var(--liq-top);
-    width:var(--liq-width);height:var(--liq-height);
-    overflow:hidden;border-radius:26%/22%;
-    outline: calc(var(--debug-outline)*2px) dashed rgba(255,255,255,.25);
-  }
-  #Liquid{
-    position:absolute;inset:-6% -6% -6% -6%; /* 少しはみ出すと回転で角が見えない */
-    width:112%;height:auto;object-fit:cover;
-    transform-origin:50% 60%;
-    transition:transform .2s ease-out;
-  }
-
-  /* ボタン */
-  .controls{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
-  button{background:#161a20;color:#eaf6ff;border:1px solid #2a3648;border-radius:10px;padding:8px 12px;font-weight:600}
+#Cap{                     /* 蓋はいちばん上 */
+  position:absolute;width:var(--cap-width);
+  left:var(--cap-left);top:var(--cap-top);
+  will-change:transform,opacity;
+  filter:drop-shadow(0 6px 20px rgba(0,0,0,.45));
+  z-index:4;
+}
 </style>
 </head>
 <body>
