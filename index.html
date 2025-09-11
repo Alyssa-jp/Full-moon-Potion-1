@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Potion — size fit</title>
+<style>
+  :root{
+    /* 全体の表示サイズ（大きさを変えたい時はここだけ） */
+    --stage: min(92vw, 520px);
+
+    /* ── 蓋（Cap）の位置と大きさ ───────────────── */
+    --cap-top: 5.5%;   /* 口に対して上下位置   ↓(+で下/−で上)  */
+    --cap-left: 35.8%; /* 左右位置             →(+で右/−で左) */
+    --cap-width: 28.5%;/* 横幅（％） */
+
+    /* ── 瓶の中の液体（Liquid）の入る箱（クリップ枠） ─ */
+    --liq-left: 17.8%;  /* 左右位置 */
+    --liq-top: 41.8%;   /* 上下位置 */
+    --liq-width: 64.4%; /* 幅 */
+    --liq-height: 38%;  /* 高さ */
+
+    /* 倾けた時に液体だけ少し控えめに回す倍率（見た目の調整用） */
+    --liq-rotate-scale: .7;
+
+    /* 作業中だけ枠を見たい時は 1 にする（終わったら 0） */
+    --debug-outline: 0;
+  }
+
+  html,body{margin:0;height:100%;background:#000;display:grid;place-items:center;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .stage{position:relative;width:var(--stage);aspect-ratio:1/1;isolation:isolate}
+
+  /* 画像の基礎スタイル（ボトル本体） */
+  .stage img.base{position:absolute;inset:0;width:100%;height:auto;user-select:none;pointer-events:none;filter:drop-shadow(0 12px 30px rgba(0,0,0,.45))}
+
+  /* 蓋 */
+  #Cap{position:absolute;width:var(--cap-width);left:var(--cap-left);top:var(--cap-top);transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+  .open #Cap{transform:translateY(-60%) rotate(-18deg)}
+
+  /* 液体はクリップ用ボックスの中だけ表示 */
+  .liq-box{
+    position:absolute;left:var(--liq-left);top:var(--liq-top);
+    width:var(--liq-width);height:var(--liq-height);
+    overflow:hidden;border-radius:26%/22%;
+    outline: calc(var(--debug-outline)*2px) dashed rgba(255,255,255,.25);
+  }
+  #Liquid{
+    position:absolute;inset:-6% -6% -6% -6%; /* 少しはみ出すと回転で角が見えない */
+    width:112%;height:auto;object-fit:cover;
+    transform-origin:50% 60%;
+    transition:transform .2s ease-out;
+  }
+
+  /* ボタン */
+  .controls{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
+  button{background:#161a20;color:#eaf6ff;border:1px solid #2a3648;border-radius:10px;padding:8px 12px;font-weight:600}
+</style>
+</head>
+<body>
+
+  <div class="stage" id="stage">
+    <!-- 瓶の中の液体（まず枠に収める） -->
+    <div class="liq-box">
+      <img id="Liquid" src="Liquid.PNG" alt="liquid">
+    </div>
+
+    <!-- 瓶本体 -->
+    <img class="base" id="Bottle" src="Bottle.PNG" alt="bottle">
+
+    <!-- 蓋 -->
+    <img id="Cap" src="Cap.PNG" alt="cap">
+  </div>
+
+  <div class="controls">
+    <button id="capBtn">Open cap</button>
+    <button id="tiltBtn">Tilt</button>
+  </div>
+
+<script>
+  // まずはサイズ合わせ確認用の最小スクリプト（動きはおまけ）
+  const body = document.body;
+  const capBtn = document.getElementById('capBtn');
+  const tiltBtn = document.getElementById('tiltBtn');
+  const liquid  = document.getElementById('Liquid');
+
+  capBtn.onclick = ()=>{
+    body.classList.toggle('open');
+    capBtn.textContent = body.classList.contains('open') ? 'Close cap' : 'Open cap';
+  };
+
+  let tilted=false;
+  tiltBtn.onclick = ()=>{
+    tilted=!tilted;
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--liq-rotate-scale')) || .7;
+    liquid.style.transform = tilted ? `rotate(-22deg) scaleY(${scale})` : 'none';
+    tiltBtn.textContent = tilted ? 'Reset' : 'Tilt';
+  };
+</script>
+</body>
+</html>
