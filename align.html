@@ -21,7 +21,14 @@
 
   html,body{margin:0;height:100%;background:#0b0f14;display:grid;place-items:center;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
   .stage{position:relative;width:var(--stage);aspect-ratio:1/1;isolation:isolate;background:#0b0f14}
-  .stage img{user-select:none;pointer-events:none}
+  .stage img{user-select:none;pointer-events:none｝
+
+/* ★ここに追記する！ */
+#Cap{ pointer-events:auto; }
+.liq-box{ pointer-events:auto; }
+
+/* 瓶本体（最上） */
+#Bottle{ ... }
 
   /* 瓶本体（最上） */
   #Bottle{position:absolute;inset:0;width:100%;height:auto;z-index:3;filter:drop-shadow(0 14px 32px rgba(0,0,0,.45))}
