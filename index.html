@@ -5,24 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Potion — size fit</title>
 <style>
-  :root{
-    /* 全体の表示サイズ（大きさを変えたい時はここだけ） */
-    --stage: min(92vw, 520px);
-
-   :root{
+:root{
   --stage: min(92vw, 520px);
 
-  /* 蓋（Cap）*/
-  --cap-top: 8.5%;
-  --cap-left: 34%;
-  --cap-width: 26%;
+  /* 蓋（Cap）の位置とサイズ */
+  --cap-top: 5%;      /* ↑上げたい: 数値小さく / 下げたい: 大きく */
+  --cap-left: 31%;    /* ←左へ: 小さく / 右へ: 大きく */
+  --cap-width: 26%;   /* 蓋の大きさ */
 
-  /* 液体（Liquid の枠）*/
-  --liq-left: 18.5%;
-  --liq-top: 50%;
-  --liq-width: 63%;
-  --liq-height: 28%;
+  /* 液体（Liquid）の枠 */
+  --liq-left: 18%;
+  --liq-top: 47%;     /* 高い→小さく / 低い→大きく */
+  --liq-width: 64%;
+  --liq-height: 30%;
 
+  --liq-rotate-scale: .7;
+  --debug-outline: 1; /* ←点線で枠を出して合わせやすく（合ったら0に戻す） */
+}
   --liq-rotate-scale: .7;
   --debug-outline: 1; /* ← 枠を一時表示 */
 }
