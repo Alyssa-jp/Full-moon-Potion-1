@@ -1,239 +1,218 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Potion Aligner (Improved)</title>
-<style>
-  :root{
-    /* 表示サイズ（必要なら変更OK） */
-    --stage: min(92vw, 520px);
-
-    /* 初期値：動かしながら更新される */
-    --cap-top: 7%;
-    --cap-left: 31%;
-    --cap-width: 27%;
-    --liq-left: 19%;
-    --liq-top: 47%;
-    --liq-width: 62%;
-    --liq-height: 30%;
-  }
-
-  html,body{margin:0;height:100%;background:#0b0f14;display:grid;place-items:center;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .stage{position:relative;width:var(--stage);aspect-ratio:1/1;isolation:isolate;background:#0b0f14}
-  .stage img, .stage .liq-box{touch-action:none} /* ピンチ操作の干渉を防ぐ */
-  .stage img{user-select:none;pointer-events:none}
-
-  /* 瓶本体（最上） */
-  #Bottle{position:absolute;inset:0;width:100%;height:auto;z-index:3;filter:drop-shadow(0 14px 32px rgba(0,0,0,.45))}
-
-  /* 液体ボックス（ドラッグ・リサイズ対象） */
-  .liq-box{
-    position:absolute;left:var(--liq-left);top:var(--liq-top);
-    width:var(--liq-width);height:var(--liq-height);
-    border:2px dashed rgba(120,180,255,.75);
-    border-radius:26%/22%; z-index:2; box-sizing:border-box;
-    background:linear-gradient(145deg, rgba(40,60,90,.25), transparent);
-    cursor:grab;
-  }
-  .liq-box:active{cursor:grabbing}
-  #Liquid{position:absolute;inset:-6% -6% -6% -6%;width:112%;height:auto;object-fit:cover;opacity:.9;mix-blend-mode:multiply}
-
-  /* 蓋（ドラッグ・リサイズ対象） */
-  #Cap{
-    position:absolute;width:var(--cap-width);left:var(--cap-left);top:var(--cap-top);
-    z-index:4; filter:drop-shadow(0 8px 22px rgba(0,0,0,.5));
-    cursor:grab; outline:2px dashed rgba(255,210,120,.75); outline-offset:4px; border-radius:10px;
-  }
-  #Cap:active{cursor:grabbing}
-
-  /* HUD */
-  .hud{
-    position:fixed;right:12px;bottom:12px;background:#0f1520cc;
-    border:1px solid #2a3648;border-radius:12px;padding:10px 12px;backdrop-filter:blur(6px);
-    min-width:260px; font:12px/1.5 ui-monospace,Menlo,monospace;
-  }
-  .row{display:flex;justify-content:space-between;gap:8px}
-  .btns{display:flex;gap:8px;margin-top:8px}
-  button{background:#161a20;color:#eaf6ff;border:1px solid #2a3648;border-radius:10px;padding:8px 12px;font-weight:600}
-  .hint{opacity:.75;margin-top:6px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Potion App (single file)</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0d0f13;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    #app{position:fixed;inset:0;display:grid;place-items:center}
+    #stage{width:100%;height:100%;max-height:100vh;touch-action:none;background:#111;
+      background-image:radial-gradient(1200px 1200px at 50% 10%,rgba(30,60,90,.35),transparent),
+                       radial-gradient(800px 800px at 70% 80%,rgba(60,30,90,.25),transparent)}
+    .ui-btn{position:fixed;top:12px;right:12px;border:none;background:rgba(0,0,0,.45);color:#fff;padding:8px 12px;margin-left:8px;border-radius:10px;font-size:18px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+    #btn-help{right:auto;left:12px}
+    .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    .panel{background:#141821;border:1px solid #2a3242;border-radius:16px;padding:20px 24px;max-width:92vw}
+    .panel h1{margin:.2em 0 .2em;font-size:22px}.panel p{margin:.5em 0}.small{opacity:.8;font-size:13px}
+    .primary{appearance:none;border:none;border-radius:12px;padding:12px 16px;background:#4aa3ff;color:#0a0f15;font-weight:700}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);padding:10px 14px;border-radius:10px}
+  </style>
 </head>
 <body>
+  <div id="app">
+    <canvas id="stage" width="1080" height="1920"></canvas>
 
-<div class="stage" id="stage">
-  <!-- 液体（枠内だけに表示） -->
-  <div class="liq-box" id="liqBox">
-    <img id="Liquid" src="Liquid.PNG" alt="liquid">
+    <button id="btn-audio" aria-label="toggle sound" class="ui-btn">🔊</button>
+    <button id="btn-help" aria-label="help" class="ui-btn">?</button>
+
+    <div id="overlay" class="overlay">
+      <div class="panel">
+        <h1>ポーション</h1>
+        <p>キャップをタップ → 揺らす → 傾けると注げます。</p>
+        <p class="small">iOSでは最初に“センサー使用”の許可が必要です。</p>
+        <button id="btn-start" class="primary">はじめる</button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
   </div>
 
-  <!-- 瓶 -->
-  <img id="Bottle" src="Bottle.PNG" alt="bottle">
+  <script>
+  // ===== Audio helper (no external files) =====
+  class AudioBus {
+    constructor(){
+      this.ctx = null; this.buffers = new Map(); this.gains = new Map();
+      this.currentLoops = new Map(); this.enabled = true;
+    }
+    async init(map){
+      if (this.ctx) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new Ctx();
+      if (this.ctx.state === "suspended") { try{ await this.ctx.resume(); }catch{} }
+      this.master = this.ctx.createGain(); this.master.gain.value = 1.0; this.master.connect(this.ctx.destination);
+      this.map = map;
+      await Promise.all(Object.entries(map).map(async ([key,spec])=>{
+        const buf = await this._fetchDecode(spec.file);
+        this.buffers.set(key, buf);
+        const g = this.ctx.createGain(); g.gain.value = spec.gain ?? 1; g.connect(this.master);
+        this.gains.set(key, g);
+      }));
+    }
+    async _fetchDecode(url){
+      const res = await fetch(url); if(!res.ok) throw new Error(res.status);
+      const ab  = await res.arrayBuffer();
+      return await new Promise((ok,ng)=> (this.ctx.decodeAudioData(ab, ok, ng)));
+    }
+    setEnabled(v){ this.enabled = !!v; if(this.master) this.master.gain.value = v?1:0; }
+    play(key, {detuneCents=0, when=0}={}){
+      if(!this.enabled) return; const buf=this.buffers.get(key); if(!buf) return;
+      const src=this.ctx.createBufferSource(); src.buffer=buf; if(src.detune) src.detune.value=detuneCents;
+      src.connect(this.gains.get(key)); src.start(this.ctx.currentTime+when); return src;
+    }
+    loop(key){
+      if(!this.enabled) return; if(this.currentLoops.has(key)) return this.currentLoops.get(key);
+      const spec=this.map[key], buf=this.buffers.get(key); if(!buf) return;
+      const src=this.ctx.createBufferSource(); src.buffer=buf; src.loop=true;
+      const ls=spec.loopStart??0; let le=spec.loopEnd; if(le==null||le<0) le=buf.duration-0.02;
+      src.loopStart=Math.max(0,ls); src.loopEnd=Math.max(ls+0.01,le);
+      src.connect(this.gains.get(key)); src.start(); this.currentLoops.set(key,src); return src;
+    }
+    stopLoop(key, fade=0.2){
+      const src=this.currentLoops.get(key); if(!src) return;
+      const g=this.gains.get(key); const t=this.ctx.currentTime; const from=g.gain.value;
+      g.gain.setValueAtTime(from,t); g.gain.linearRampToValueAtTime(0.0001,t+fade);
+      setTimeout(()=>{ try{src.stop()}catch{} this.currentLoops.delete(key); g.gain.value=this.map[key]?.gain??1; }, Math.ceil(fade*1000));
+    }
+    setGain(key, v){ const g=this.gains.get(key); if(g) g.gain.value=v; }
+  }
 
-  <!-- 蓋 -->
-  <img id="Cap" src="Cap.PNG" alt="cap">
-</div>
+  // ===== App =====
+  const VIRTUAL_W=1080, VIRTUAL_H=1920;
+  const cfg = { tiltThresholdDeg:35, flowMaxPerSec:0.35, shakeThresholdG:1.2, sloshDamping:0.92 };
 
-<div class="hud" id="hud">
-  <div class="row"><div>cap-left :</div><div id="capL">--</div></div>
-  <div class="row"><div>cap-top  :</div><div id="capT">--</div></div>
-  <div class="row"><div>cap-width:</div><div id="capW">--</div></div>
-  <div class="row"><div>liq-left :</div><div id="liqL">--</div></div>
-  <div class="row"><div>liq-top  :</div><div id="liqT">--</div></div>
-  <div class="row"><div>liq-width:</div><div id="liqW">--</div></div>
-  <div class="row"><div>liq-height:</div><div id="liqH">--</div></div>
+  const state = { mode:"Idle_Closed", volume:1.0, tiltDeg:0, shake:0, sparkleCooldown:0, playedKotsun:false };
 
-  <div class="btns">
-    <button id="copyBtn">Copy CSS</button>
-    <button id="resetBtn">Reset</button>
-  </div>
-  <div class="hint">ドラッグ：移動 / 2本指ピンチ or ホイール：サイズ変更</div>
-</div>
-
-<script>
-/* 基本ユーティリティ */
-const $ = s=>document.querySelector(s);
-const css = (prop,val)=>document.documentElement.style.setProperty(prop,val);
-const fmt = v => (Math.round(v*10)/10).toFixed(1) + '%';
-
-const stage   = $('#stage');
-const cap     = $('#Cap');
-const liqBox  = $('#liqBox');
-
-/* 現在値の表示を更新 */
-function updateHUD(){
-  const style = getComputedStyle(document.documentElement);
-  $('#capL').textContent = style.getPropertyValue('--cap-left').trim();
-  $('#capT').textContent = style.getPropertyValue('--cap-top').trim();
-  $('#capW').textContent = style.getPropertyValue('--cap-width').trim();
-  $('#liqL').textContent = style.getPropertyValue('--liq-left').trim();
-  $('#liqT').textContent = style.getPropertyValue('--liq-top').trim();
-  $('#liqW').textContent = style.getPropertyValue('--liq-width').trim();
-  $('#liqH').textContent = style.getPropertyValue('--liq-height').trim();
-}
-
-/* ステージ基準の％に変換 */
-function toPercent(x,y){
-  const r = stage.getBoundingClientRect();
-  return { px: ((x-r.left)/r.width)*100, py: ((y-r.top)/r.height)*100 };
-}
-
-/* 汎用ドラッグ（要素左上を基準に移動） */
-function enableDrag(el, onmove){
-  let active=false, sx=0, sy=0, baseL=0, baseT=0;
-  const down = e=>{
-    active=true;
-    const p = (e.touches? e.touches[0]:e);
-    sx=p.clientX; sy=p.clientY;
-    const rect=el.getBoundingClientRect();
-    const st=stage.getBoundingClientRect();
-    baseL=((rect.left-st.left)/st.width)*100;
-    baseT=((rect.top -st.top )/st.height)*100;
-    e.preventDefault();
+  // 今の配置（直下のPNG）そのまま使う：
+  const images = {
+    background: { src: "./Background.png" },  // あれば表示（なくてもOK）
+    bottle:     { src: "./Bottle.PNG" },
+    cap:        { src: "./Cap.PNG" },
+    liquid:     { src: "./Liquid.PNG" },
+    surface:    { src: null },                // なくてもOK（ラインで描く）
+    sparkles:   { src: "./Sparkles.png" }     // あれば描画（なくてもOK）
   };
-  const move = e=>{
-    if(!active) return;
-    const p = (e.touches? e.touches[0]:e);
-    const st=stage.getBoundingClientRect();
-    const dx = (p.clientX - sx)/st.width*100;
-    const dy = (p.clientY - sy)/st.height*100;
-    onmove(baseL+dx, baseT+dy);
-    updateHUD();
-  };
-  const up=()=>{ active=false; };
-  el.addEventListener('mousedown',down);  window.addEventListener('mousemove',move);  window.addEventListener('mouseup',up);
-  el.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
-}
 
-/* 汎用リサイズ（ピンチとマウスホイールに対応） */
-function enableResize(element, widthVar, heightVar = null) {
-  // --- 1. ピンチ操作 ---
-  let touching = false, startDist = 0, baseW = 0, baseH = 0;
-  element.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      touching = true;
-      const [a, b] = e.touches;
-      startDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const st = stage.getBoundingClientRect();
-      const r = element.getBoundingClientRect();
-      baseW = (r.width / st.width) * 100;
-      if (heightVar) {
-        baseH = (r.height / st.height) * 100;
+  // MP3 も直下に置く（同じ場所）
+  const AUDIO_MAP = {
+    cap_open: { file:"./cap_pop.mp3",      loop:false, gain:0.9 },
+    pour:     { file:"./pour_loop.mp3",    loop:true,  gain:0.8, loopStart:0.02, loopEnd:-1 },
+    sparkle:  { file:"./glitter_tinkle.mp3", loop:false, gain:0.7 },
+    cap_hit:  { file:"./kotsun.mp3",       loop:false, gain:0.6 }
+  };
+
+  const app = { canvas:null, ctx:null, audio:new AudioBus(), lastT:0, accPrev:null,
+                cap:{x:540, y:730, r:120, open:false, angle:0}, toastTimer:null };
+
+  function $(s){ return document.querySelector(s); }
+  function showToast(msg,ms=1500){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(app.toastTimer); app.toastTimer=setTimeout(()=>t.hidden=true,ms); }
+
+  function loadImages(dict){
+    return Promise.all(Object.values(dict).map(obj=>new Promise(res=>{
+      if(!obj?.src){ obj.img=null; return res(); }
+      const img=new Image(); img.src=obj.src; img.onload=()=>{obj.img=img;res()}; img.onerror=()=>{obj.img=null;res()};
+    })));
+  }
+
+  async function start(){
+    app.canvas=$("#stage"); app.ctx=app.canvas.getContext("2d");
+    await loadImages(images);
+    await app.audio.init(AUDIO_MAP);
+    bindUI();
+    requestAnimationFrame(loop);
+  }
+
+  function bindUI(){
+    $("#btn-start").addEventListener("click", async ()=>{
+      $("#overlay").style.display="none";
+      await requestMotionPermission();
+      if(app.audio?.ctx?.state==="suspended") await app.audio.ctx.resume();
+      showToast("準備OK！");
+    });
+    const btnAudio=$("#btn-audio");
+    btnAudio.addEventListener("click", ()=>{
+      const on=btnAudio.textContent.includes("🔊");
+      btnAudio.textContent=on?"🔇":"🔊"; app.audio.setEnabled(!on);
+    });
+    $("#btn-help").addEventListener("click", ()=> $("#overlay").style.display="grid");
+    app.canvas.addEventListener("pointerdown", (e)=>{
+      const pt=getCanvasPoint(e);
+      if(hitCap(pt.x,pt.y) && state.mode==="Idle_Closed"){
+        state.mode="Idle_Open"; app.cap.open=true; app.cap.angle=-25*Math.PI/180;
+        app.audio.play("cap_open"); setTimeout(()=>{ if(!state.playedKotsun){ state.playedKotsun=true; app.audio.play("cap_hit",{detuneCents:Math.random()*40-20}); }},220);
       }
+    });
+    window.addEventListener("devicemotion", onMotion, {capture:false});
+    window.addEventListener("deviceorientation", onOrientation, {capture:false});
+    app.canvas.addEventListener("touchmove", e=>e.preventDefault(), {passive:false});
+  }
+
+  function getCanvasPoint(e){ const r=app.canvas.getBoundingClientRect(); const rx=(e.clientX-r.left)/r.width, ry=(e.clientY-r.top)/r.height; return {x:rx*VIRTUAL_W, y:ry*VIRTUAL_H}; }
+  function hitCap(x,y){ const dx=x-app.cap.x, dy=y-app.cap.y; return dx*dx+dy*dy<=app.cap.r*app.cap.r; }
+
+  async function requestMotionPermission(){
+    const DM=window.DeviceMotionEvent, DO=window.DeviceOrientationEvent;
+    try{ if(DM&&typeof DM.requestPermission==="function"){ const r=await DM.requestPermission(); if(r!=="granted") showToast("センサー未許可: 揺れ/傾きは使えません"); }
+         if(DO&&typeof DO.requestPermission==="function"){ const r2=await DO.requestPermission(); if(r2!=="granted") showToast("センサー未許可: 傾きは使えません"); } }catch(e){}
+  }
+
+  function onMotion(ev){
+    const a=ev.accelerationIncludingGravity; if(!a) return;
+    const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2)/9.80665;
+    if(app.accPrev==null) app.accPrev=mag; const delta=Math.abs(mag-app.accPrev); app.accPrev=mag;
+    state.shake=state.shake*0.85+delta*0.15;
+    if(state.sparkleCooldown>0) state.sparkleCooldown-=16;
+    if(delta>cfg.shakeThresholdG && state.sparkleCooldown<=0){ app.audio.play("sparkle"); state.sparkleCooldown=400; }
+  }
+  function onOrientation(ev){ const gamma=ev.gamma??0; state.tiltDeg=Math.abs(gamma); }
+
+  function physics(dt){
+    const tilt=state.tiltDeg;
+    if(state.mode==="Idle_Open" && tilt>cfg.tiltThresholdDeg){ state.mode="Pouring"; app.audio.loop("pour"); }
+    if(state.mode==="Pouring"){
+      const flow=Math.max(0, Math.min(1,(tilt-cfg.tiltThresholdDeg)/(90-cfg.tiltThresholdDeg)));
+      state.volume=Math.max(0, state.volume - flow*cfg.flowMaxPerSec*dt);
+      app.audio.setGain("pour", 0.2+0.8*flow);
+      if(state.volume<=0){ state.mode="Empty"; app.audio.stopLoop("pour",0.2); }
+      if(tilt<=cfg.tiltThresholdDeg){ state.mode="Idle_Open"; app.audio.stopLoop("pour",0.2); }
     }
-  }, { passive: false });
+  }
 
-  window.addEventListener('touchmove', e => {
-    if (!touching || e.touches.length !== 2) return;
-    const [a, b] = e.touches;
-    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    const scale = dist / startDist;
-    css(widthVar, fmt(baseW * scale));
-    if (heightVar) {
-      css(heightVar, fmt(baseH * scale));
-    }
-    updateHUD();
-  }, { passive: false });
+  function loop(t){ const dt=Math.min(0.05,(t-(app.lastT||t))/1000); app.lastT=t; physics(dt); draw(); requestAnimationFrame(loop); }
 
-  window.addEventListener('touchend', () => {
-    if (touching) {
-      touching = false;
-    }
-  });
+  function draw(){
+    const ctx=app.ctx; ctx.save(); ctx.clearRect(0,0,VIRTUAL_W,VIRTUAL_H);
+    const bg=images.background.img; if(bg){ const s=Math.max(VIRTUAL_W/bg.width, VIRTUAL_H/bg.height); const w=bg.width*s, h=bg.height*s; ctx.drawImage(bg,(VIRTUAL_W-w)/2,(VIRTUAL_H-h)/2,w,h); }
+    const cx=VIRTUAL_W/2, cy=VIRTUAL_H*0.62;
+    const volH=620*state.volume;
+    if(images.liquid.img){ const li=images.liquid.img; const lw=li.width, lh=Math.max(1, li.height*state.volume); ctx.drawImage(li, cx-lw/2, cy-lh/2, lw, lh);
+    }else{ ctx.fillStyle="#2fb3ff"; ctx.globalAlpha=.75; ctx.fillRect(cx-220, cy+180-volH, 440, volH); ctx.globalAlpha=1; }
+    if(images.bottle.img){ const bi=images.bottle.img; ctx.drawImage(bi, cx-bi.width/2, cy-bi.height/2);
+    }else{ ctx.strokeStyle="#88a"; ctx.lineWidth=8; ctx.strokeRect(cx-240, cy-420, 480, 820); }
+    const y=cy+180-volH-10;
+    if(images.surface?.img){ const si=images.surface.img; ctx.drawImage(si, cx-si.width/2, y-si.height/2); }
+    else { ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.beginPath(); ctx.ellipse(cx,y,210,12,0,0,Math.PI*2); ctx.stroke(); }
+    ctx.save(); ctx.translate(app.cap.x,app.cap.y); ctx.rotate(app.cap.open?app.cap.angle:0);
+    if(images.cap.img){ const ci=images.cap.img; ctx.drawImage(ci,-ci.width/2,-ci.height/2); }
+    else { ctx.fillStyle="#d44"; ctx.beginPath(); ctx.arc(0,0,app.cap.r,0,Math.PI*2); ctx.fill(); }
+    ctx.restore();
+    if(images.sparkles.img && state.shake>0.1){ const sp=images.sparkles.img; const s=0.8+Math.min(1.6,state.shake)*0.4; ctx.globalAlpha=.7; ctx.drawImage(sp, cx-(sp.width*s)/2, cy-420, sp.width*s, sp.height*s); ctx.globalAlpha=1; }
+    ctx.fillStyle="rgba(255,255,255,.9)"; ctx.font="28px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"; ctx.textAlign="right";
+    ctx.fillText(`Tilt: ${state.tiltDeg.toFixed(0)}°`, VIRTUAL_W-16, 40); ctx.fillText(`Vol: ${(state.volume*100)|0}%`, VIRTUAL_W-16, 76);
+    ctx.restore();
+  }
 
-  // --- 2. マウスホイール操作 ---
-  element.addEventListener('wheel', e => {
-    e.preventDefault();
-    const style = getComputedStyle(document.documentElement);
-    const currentWidth = parseFloat(style.getPropertyValue(widthVar));
-    const currentHeight = heightVar ? parseFloat(style.getPropertyValue(heightVar)) : 0;
-    
-    const scaleFactor = 1.1;
-    const scale = e.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
-
-    css(widthVar, fmt(currentWidth * scale));
-    if (heightVar) {
-      css(heightVar, fmt(currentHeight * scale));
-    }
-    updateHUD();
-  }, { passive: false });
-}
-
-/* 各要素に機能を適用 */
-enableDrag(cap, (L,T)=>{
-  css('--cap-left', fmt(L));
-  css('--cap-top',  fmt(T));
-});
-enableDrag(liqBox, (L,T)=>{
-  css('--liq-left', fmt(L));
-  css('--liq-top',  fmt(T));
-});
-
-enableResize(cap, '--cap-width');
-enableResize(liqBox, '--liq-width', '--liq-height');
-
-
-/* コピー・リセット */
-$('#copyBtn').onclick=()=>{
-  const txt =
-`--cap-left: ${$('#capL').textContent};
---cap-top: ${$('#capT').textContent};
---cap-width: ${$('#capW').textContent};
---liq-left: ${$('#liqL').textContent};
---liq-top: ${$('#liqT').textContent};
---liq-width: ${$('#liqW').textContent};
---liq-height: ${$('#liqH').textContent};`;
-  navigator.clipboard.writeText(txt);
-  $('#copyBtn').textContent='Copied!';
-  setTimeout(()=>$('#copyBtn').textContent='Copy CSS',900);
-};
-$('#resetBtn').onclick=()=>{
-  css('--cap-top','7%'); css('--cap-left','31%'); css('--cap-width','27%');
-  css('--liq-left','19%'); css('--liq-top','47%'); css('--liq-width','62%'); css('--liq-height','30%');
-  updateHUD();
-};
-
-updateHUD();
-</script>
+  window.addEventListener("load", start);
+  </script>
 </body>
 </html>
