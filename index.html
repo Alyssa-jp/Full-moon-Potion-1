@@ -38,6 +38,7 @@
   .tip{
     position:fixed; top:18px; left:50%; transform:translateX(-50%);
     background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12); padding:8px 12px; border-radius:10px; z-index:40; font-size:13px;
+    transition:opacity .25s;
   }
 
   .scene{ position:relative; width:100%; height:100%; display:grid; place-items:center; perspective:1000px;}
@@ -100,12 +101,10 @@
           <img class="img base" src="Bottle.PNG" alt="Bottle"/>
           <img class="img liquidimg" src="Liquid.PNG" alt="Liquid"/>
           <img class="img sparkles" src="Sparkles.PNG" alt="Sparkles"/>
-          <!-- SVGは常時表示（液面アニメ＆キャップタップ用） -->
+          <!-- SVG（液面アニメ＆キャップの当たり判定用） -->
           <svg class="svg svg-root" viewBox="0 0 280 520" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <defs>
-              <clipPath id="liquidClip">
-                <path d="M65 130 Q140 110 215 130 L215 440 Q140 470 65 440 Z" />
-              </clipPath>
+              <clipPath id="liquidClip"><path d="M65 130 Q140 110 215 130 L215 440 Q140 470 65 440 Z"/></clipPath>
               <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
               <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#6bd3ff"/><stop offset="80%" stop-color="#1a9cff"/>
@@ -115,10 +114,7 @@
               </linearGradient>
             </defs>
             <rect x="0" y="0" width="280" height="520" fill="transparent"/>
-            <!-- 薄いガラス表現（画像と干渉しない程度の薄さ） -->
-            <path d="M60 120 Q140 90 220 120 v330 Q140 490 60 450z"
-                  fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.28)" stroke-width="1.6" />
-            <!-- 液体（アニメ対象） -->
+            <path d="M60 120 Q140 90 220 120 v330 Q140 490 60 450z" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.28)" stroke-width="1.6" />
             <g clip-path="url(#liquidClip)" class="liquid-clip" id="liquidClipGroup">
               <rect id="liquidRect" x="62" y="240" width="158" height="220" rx="18" ry="18" fill="url(#lg)" filter="url(#glow)"/>
               <ellipse id="liquidSurface" cx="140" cy="238" rx="74" ry="16" fill="rgba(255,255,255,.7)"/>
@@ -129,14 +125,12 @@
                 <circle class="sparkle" cx="110" cy="380" r="2.2" fill="#e8fbff"/>
               </g>
             </g>
-            <!-- キャップ（タップ用） -->
             <g id="cap" class="cap closed">
               <rect x="104" y="34" width="72" height="22" rx="8" fill="#0b1120"/>
               <rect x="100" y="50" width="80" height="26" rx="10" fill="#2b3a68"/>
               <rect x="100" y="50" width="80" height="26" rx="10" fill="url(#capg)" opacity=".6"/>
             </g>
           </svg>
-          <!-- 注ぎストリーム -->
           <div id="stream" class="stream"></div>
         </div>
       </div>
@@ -172,6 +166,10 @@
     sparkles: document.querySelectorAll('.sparkle')
   };
 
+  // エラーを画面表示
+  window.addEventListener('error', e=> flashTip('エラー：' + (e.message||'unknown')));
+  window.addEventListener('unhandledrejection', e=> flashTip('Promiseエラー：' + (e.reason && e.reason.message ? e.reason.message : 'unknown')));
+
   const state = {
     hasStarted: false,
     capOpen: false,
@@ -183,7 +181,7 @@
     useDevice: false
   };
 
-  /* ---------- Audio : repo root files (exact case) ---------- */
+  /* ---------- Audio (repo root exact names) ---------- */
   const sfx = {
     pop: makeSmartAudio(['cap_pop.mp3','Kotun.mp3'], {fallback:'pop'}),
     sparkle: makeSmartAudio(['glitter_tinkle.mp3'], {fallback:'sparkle'}),
@@ -265,7 +263,7 @@
   function onCapTap(){
     if (!state.hasStarted || state.capOpen) return;
     state.capOpen = true;
-    if (document.getElementById('cap')){ cap.classList.remove('closed'); cap.classList.add('open'); }
+    if (el.cap){ el.cap.classList.remove('closed'); el.cap.classList.add('open'); }  // ← 修正点
     sfx.pop.play();
   }
 
@@ -335,7 +333,7 @@
     el.stream.style.height = (len*4) + 'px';
   }
 
-  function stopPour(empty=false){
+  function stopPour(){
     if (state.pouring){
       state.pouring = false;
       el.pourState.textContent = 'OFF';
@@ -364,7 +362,7 @@
     el.tip.textContent = msg;
     el.tip.style.opacity = '1';
     clearTimeout(el.tip._t);
-    el.tip._t = setTimeout(()=>{ el.tip.style.opacity = '.0'; }, 2400);
+    el.tip._t = setTimeout(()=>{ el.tip.style.opacity = '.0'; }, 2800);
   }
 
   function resetAll(){
@@ -389,6 +387,7 @@
     el.bottle.addEventListener('click', ()=>{ if (state.level<=0){ state.level=1; updateLiquidVisuals(); flashTip('満たしたよ'); }});
   }
 
+  // 初期化
   updateLiquidVisuals();
   setAngle(0);
 })();
