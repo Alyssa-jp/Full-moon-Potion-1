@@ -3,331 +3,133 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Moon Potion (failsafe)</title>
+<title>Moon Potion – mini</title>
 <style>
-  :root{
-    --bottle-width: 280px;
-    --pour-threshold: 25;
-    --max-tilt: 60;
-    --jiggle-ms: 500ms;
-    --level-start: 1;
-    --level-min: 0.02;
-    --cap-open-dx: -32px;
-    --cap-open-dy: -58px;
-    --cap-open-rot: -45deg;
-  }
+  :root{ --bottle-width:280px; --pour-threshold:25; --max-tilt:60; --level-min:.02; --cap-open-dx:-32px; --cap-open-dy:-58px; --cap-open-rot:-45deg; }
   *{box-sizing:border-box} html,body{height:100%}
-  body{
-    margin:0; font-family:ui-rounded,system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
-    background:url("Background.PNG") center/cover no-repeat fixed,
-      radial-gradient(1200px 800px at 30% 20%,#0f1a2b 0%,#090e18 50%,#05060a 100%);
-    color:#f7fbff; overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:manipulation;
-  }
-  .safe-area{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); height:100%}
-  .app{height:100%; display:grid; place-items:center;}
-  .scene{ position:relative; width:100%; height:100%; display:grid; place-items:center; }
-  .bottle-wrap{ position:relative; width:var(--bottle-width); aspect-ratio:280/520; transform-origin:50% 85%; transition:filter .25s ease; }
-  .bottle-wrap.pouring{ filter: drop-shadow(0 24px 24px rgba(0,0,0,.4));}
-  .img,.svg{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block }
-  .img{ pointer-events:none }
-  .capimg{
-    position:absolute; left:50%; top:17%; width:80px; transform:translate(-50%,-50%);
-    transform-origin:50% 70%; transition:transform .35s ease; cursor:pointer; z-index:5;
-  }
-  .capimg.closed{ transform:translate(-50%,-50%) rotate(0) }
+  body{ margin:0; font-family:ui-rounded,system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+        background:url("Background.PNG") center/cover no-repeat fixed, radial-gradient(1200px 800px at 30% 20%,#0f1a2b 0%,#090e18 50%,#05060a 100%);
+        color:#f7fbff; overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:manipulation;}
+  .scene{position:relative; width:100%; height:100%; display:grid; place-items:center;}
+  .bottle{position:relative; width:var(--bottle-width); aspect-ratio:280/520; transform-origin:50% 85%;}
+  .img,.svg{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block}
+  .img{pointer-events:none}
+  .capimg{position:absolute; left:50%; top:17%; width:80px; transform:translate(-50%,-50%); transform-origin:50% 70%; transition:transform .35s ease; cursor:pointer; z-index:5}
   .capimg.open{ transform:translate(calc(-50% + var(--cap-open-dx)), calc(-50% + var(--cap-open-dy))) rotate(var(--cap-open-rot)) }
-
-  /* 外部Sparkles/Liquidは使わない（SVGで描く） */
-  .img.liquidimg,.img.sparkles{ display:none!important }
-
-  .sparkle{ opacity:0; transform-origin:50% 50% }
-  .sparkle.show{ animation: sparkle 900ms ease-out forwards }
-  @keyframes sparkle{0%{opacity:0; transform:scale(.5) translateY(0)}30%{opacity:1}100%{opacity:0; transform:scale(1.8) translateY(-24px)}}
-  .jiggle{ animation:jiggle var(--jiggle-ms) cubic-bezier(.2,.8,.2,1)}
-  @keyframes jiggle{0%{transform:rotate(var(--rot,0deg)) translateY(0)}25%{transform:rotate(calc(var(--rot,0deg)+.8deg)) translateY(-2px)}50%{transform:rotate(var(--rot,0deg)) translateY(0)}75%{transform:rotate(calc(var(--rot,0deg)-.8deg)) translateY(1px)}100%{transform:rotate(var(--rot,0deg)) translateY(0)}}
-
-  .stream{
-    position:absolute; left:50%; top:22%; width:10px; height:0; border-radius:8px;
-    background:linear-gradient(#8bd5ff,#3aa9ff 60%, rgba(255,255,255,.9));
-    box-shadow:0 0 12px rgba(100,200,255,.6), inset 0 0 12px rgba(255,255,255,.8);
-    transition:height .1s ease; filter:blur(.2px); transform:rotate(12deg); opacity:.95; display:none;
-  }
-  .stream.on{display:block}
-
-  .hud{position:fixed; left:10px; bottom:10px; display:flex; gap:10px; pointer-events:none; opacity:.95; font-size:12px; flex-wrap:wrap; max-width:70%}
-  .chip{background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(6px); padding:6px 10px; border-radius:999px; pointer-events:auto}
-  .kbd{ padding:1px 6px; border-radius:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08) }
-  .tip{position:fixed; top:18px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12); padding:8px 12px; border-radius:10px; z-index:40; font-size:13px; transition:opacity .25s;}
-  #startBtn{position:fixed; inset:0; margin:auto; height:56px; width:min(320px,80vw); border-radius:999px; background:#25a2ff; color:#fff; border:none; font-weight:700; font-size:16px; letter-spacing:.03em; box-shadow:0 10px 32px rgba(37,162,255,.35); z-index:50;}
-  html.started #startBtn{display:none}
-
-  /* Fallbackコントローラ */
-  .ctrl{ position:fixed; right:10px; bottom:10px; display:flex; gap:8px; flex-wrap:wrap }
-  .ctrl button{ background:#25a2ff; color:#fff; border:none; padding:8px 10px; border-radius:10px; font-weight:700 }
-  .ctrl .ghost{ background:rgba(255,255,255,.1) }
-  .tilt-slider{ position:fixed; left:50%; bottom:56px; transform:translateX(-50%); width:min(560px,90vw); height:18px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden }
-  .tilt-fill{ height:100%; width:50%; background:linear-gradient(90deg,#42ffb3,#21b1ff) }
-  .tilt-hint{ position:fixed; left:50%; bottom:38px; transform:translateX(-50%); font-size:12px; opacity:.8 }
-
-  @media (max-width:380px){ :root{ --bottle-width:240px } }
+  .stream{ position:absolute; left:50%; top:22%; width:10px; height:0; border-radius:8px;
+           background:linear-gradient(#8bd5ff,#3aa9ff 60%,rgba(255,255,255,.9));
+           box-shadow:0 0 12px rgba(100,200,255,.6), inset 0 0 12px rgba(255,255,255,.8);
+           transition:height .1s ease; transform:rotate(12deg); opacity:.95; display:none }
+  .stream.on{ display:block }
+  .hud{ position:fixed; left:10px; bottom:10px; display:flex; gap:10px; flex-wrap:wrap; font-size:12px; opacity:.95 }
+  .chip{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(6px); padding:6px 10px; border-radius:999px }
+  .btn{ background:#25a2ff; color:#fff; border:none; padding:8px 10px; border-radius:10px; font-weight:700; cursor:pointer }
+  .ghost{ background:rgba(255,255,255,.12) }
+  .tiltbar{ position:fixed; right:10px; bottom:10px; width:min(560px,90vw); height:18px; background:rgba(255,255,255,.12); border-radius:999px; overflow:hidden }
+  .tiltfill{ height:100%; width:50%; background:linear-gradient(90deg,#42ffb3,#21b1ff) }
 </style>
 </head>
 <body>
-  <div class="safe-area">
-    <div class="app">
-      <div class="scene">
-        <div id="bottle" class="bottle-wrap" aria-label="potion bottle">
-          <img class="img base" src="Bottle.PNG" alt="Bottle"/>
-
-          <!-- 液体（SVG描画） -->
-          <svg class="svg" viewBox="0 0 280 520" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <clipPath id="liquidClip"><path d="M65 130 Q140 110 215 130 L215 440 Q140 470 65 440 Z"/></clipPath>
-              <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-              <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6bd3ff"/><stop offset="80%" stop-color="#1a9cff"/></linearGradient>
-            </defs>
-            <g clip-path="url(#liquidClip)">
-              <rect id="liquidRect" x="62" y="240" width="158" height="220" rx="18" ry="18" fill="url(#lg)" filter="url(#glow)"/>
-              <ellipse id="liquidSurface" cx="140" cy="238" rx="74" ry="16" fill="rgba(255,255,255,.7)"/>
-              <g id="sparkles">
-                <circle class="sparkle" cx="120" cy="330" r="2" fill="#e8fbff"/>
-                <circle class="sparkle" cx="160" cy="360" r="1.8" fill="#e8fbff"/>
-                <circle class="sparkle" cx="150" cy="310" r="1.6" fill="#e8fbff"/>
-                <circle class="sparkle" cx="110" cy="380" r="2.2" fill="#e8fbff"/>
-              </g>
-            </g>
-          </svg>
-
-          <img src="Cap.PNG" alt="cap" id="capImg" class="capimg closed"/>
-          <div id="stream" class="stream"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="tip" id="tip">①「はじめる」or 画面タップ → ② キャップ → ③ 傾ける（スライダーでもOK）</div>
-
-    <div class="hud">
-      <div class="chip">角度:<span id="angleText">0</span>° / 注ぎ <span id="pourState">OFF</span></div>
-      <div class="chip">残量:<span id="levelText">100</span>%</div>
-      <div id="dbg" class="chip">sensor: ? | raw: - | orient: -</div>
-    </div>
-
-    <div class="ctrl">
-      <button id="btnToggle">開ける/閉める</button>
-      <button id="btnShake" class="ghost">シェイク</button>
-      <button id="btnZero" class="ghost">ゼロ点</button>
-      <button id="btnReset" class="ghost">リセット</button>
-    </div>
-
-    <div class="tilt-slider" id="tiltBar"><div id="tiltFill" class="tilt-fill"></div></div>
-    <div class="tilt-hint">指ドラッグで傾き調整（センサーなしでもOK）</div>
-
-    <button id="startBtn"
-      onclick="(function(){document.documentElement.classList.add('started'); if(window.__start){window.__start();}})()">はじめる（センサーと音を許可）</button>
+<div class="scene">
+  <div id="bottle" class="bottle">
+    <img class="img" src="Bottle.PNG" alt="Bottle"/>
+    <svg class="svg" viewBox="0 0 280 520" aria-hidden="true">
+      <defs>
+        <clipPath id="clip"><path d="M65 130 Q140 110 215 130 L215 440 Q140 470 65 440 Z"/></clipPath>
+        <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6bd3ff"/><stop offset="80%" stop-color="#1a9cff"/></linearGradient>
+      </defs>
+      <g clip-path="url(#clip)">
+        <rect id="liq" x="62" y="240" width="158" height="220" rx="18" ry="18" fill="url(#lg)"/>
+        <ellipse id="surf" cx="140" cy="238" rx="74" ry="16" fill="rgba(255,255,255,.7)"/>
+      </g>
+    </svg>
+    <img id="cap" class="capimg" src="Cap.PNG" alt="cap"/>
+    <div id="stream" class="stream"></div>
   </div>
+</div>
+
+<div class="hud">
+  <div class="chip">角度:<span id="deg">0</span>° / 注ぎ <span id="pour">OFF</span></div>
+  <div class="chip">
+    <button id="toggle">開ける/閉める</button>
+    <button id="shake" class="ghost">シェイク</button>
+    <button id="reset" class="ghost">リセット</button>
+  </div>
+</div>
+<div class="tiltbar" id="bar"><div id="fill" class="tiltfill"></div></div>
 
 <script>
 (()=> {
-  const $ = (id)=>document.getElementById(id);
   const el = {
-    start: $('startBtn'), bottle: $('bottle'), cap: $('capImg'), stream: $('stream'),
-    angleText: $('angleText'), pourState: $('pourState'), levelText: $('levelText'),
-    tiltBar: $('tiltBar'), tiltFill: $('tiltFill'), tip: $('tip'), dbg: $('dbg'),
-    liquidRect: $('liquidRect'), liquidSurface: $('liquidSurface'),
-    btnToggle: $('btnToggle'), btnShake: $('btnShake'), btnZero: $('btnZero'), btnReset: $('btnReset'),
+    bottle: document.getElementById('bottle'),
+    cap: document.getElementById('cap'),
+    stream: document.getElementById('stream'),
+    liq: document.getElementById('liq'),
+    surf: document.getElementById('surf'),
+    deg: document.getElementById('deg'),
+    pour: document.getElementById('pour'),
+    bar: document.getElementById('bar'),
+    fill: document.getElementById('fill'),
+    btnToggle: document.getElementById('toggle'),
+    btnShake: document.getElementById('shake'),
+    btnReset: document.getElementById('reset')
   };
 
-  // 状態
-  const state = { hasStarted:false, capOpen:false, angle:0, level:1, pouring:false, lastShake:0, rafId:null, useDevice:false, baseAngle:null };
-
-  // どこでも最初のタップで開始
-  window.addEventListener('touchstart', autoStart, {once:true});
-  window.addEventListener('mousedown', autoStart, {once:true});
-  function autoStart(){ if(!state.hasStarted){ document.documentElement.classList.add('started'); start(); } }
-  window.__start = start;
-
-  /* ===== Audio ===== */
-  const sfx = {
-    pop: makeAudio(['cap_pop.mp3','Kotun.mp3'], {fallback:'pop'}),
-    sparkle: makeAudio(['glitter_tinkle.mp3'], {fallback:'sparkle'}),
-    pour: makeAudio(['pour_loop.mp3'], {loop:true, fallback:'noise'})
-  };
-  function makeAudio(srcs, opts={}){
-    const a = new Audio(); let chosen=srcs[0]||null;
-    if(chosen) a.src=chosen; a.preload='auto'; a.loop=!!opts.loop;
-    const AC = (window.AudioContext||window.webkitAudioContext); const ac = AC?new AC():null; let unlocked=false;
-    async function play(){
-      if(chosen){ try{ if(!unlocked){ await a.play().then(()=>a.pause()).catch(()=>{}); unlocked=true; }
-        a.currentTime=0; await a.play(); return; }catch(_){} }
-      if(!ac) return;
-      const now=ac.currentTime, dur=(opts.fallback==='noise')?1.2:(opts.fallback==='pop'?0.12:0.4);
-      const g=ac.createGain(); g.connect(ac.destination);
-      if(opts.fallback==='noise'){
-        const src=ac.createBufferSource(); const buf=ac.createBuffer(1, ac.sampleRate*dur, ac.sampleRate);
-        const ch=buf.getChannelData(0); for(let i=0;i<ch.length;i++) ch[i]=(Math.random()*2-1)*(1-i/ch.length);
-        src.buffer=buf; src.connect(g); g.gain.value=.15; src.start(now); src.stop(now+dur);
-      }else{
-        const o=ac.createOscillator(); o.connect(g); o.type=(opts.fallback==='pop')?'sine':'triangle';
-        o.frequency.setValueAtTime((opts.fallback==='pop')?520:1600, now);
-        g.gain.setValueAtTime(0.2, now); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
-        o.start(now); o.stop(now+dur);
-      }
-    }
-    function stop(){ try{ a.pause(); }catch(_){} }
-    return {play, stop, ac};
+  const S = { angle:0, level:1, pouring:false, capOpen:false, raf:null };
+  function setAngle(a){
+    const max = 60; const c = Math.max(-max, Math.min(max, a));
+    S.angle = c; el.bottle.style.transform = `rotate(${c}deg)`;
+    el.deg.textContent = c.toFixed(0);
+    el.fill.style.width = `${50 + (c/max)*50}%`;
+    if (S.capOpen && Math.abs(c) >= 25){ startPour(); } else { stopPour(); }
   }
-  function unlockAudio(){ Object.values(sfx).forEach(s=>{ if(s.ac && s.ac.state==='suspended') s.ac.resume().catch(()=>{}); }); }
-
-  async function start(){
-    state.hasStarted = true;
-    if (el.start) el.start.style.display='none';
-    unlockAudio();
-    state.useDevice = await requestSensors();
-    bind();
-    updateLiquid(); setAngle(0);
-    flash('キャップをタップ → 傾ける（スライダーでもOK）');
-  }
-
-  async function requestSensors(){
-    let ok=false;
-    try{
-      if (typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){ ok = (await DeviceMotionEvent.requestPermission())==='granted' || ok; } else ok=true;
-      if (typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){ ok = (await DeviceOrientationEvent.requestPermission())==='granted' || ok; } else ok=true;
-    }catch(_){ ok=false; }
-    return ok;
-  }
-
-  /* ===== センサー処理（方位 -> 傾き） ===== */
-  function orientationAngle(){
-    if (screen.orientation && typeof screen.orientation.angle==='number') return screen.orientation.angle;
-    if (typeof window.orientation==='number') return window.orientation; // iOS legacy
-    return 0;
-  }
-  function mapToTilt(ev){
-    const o = orientationAngle(); // 0, 90, -90, 180
-    let raw = 0;
-    if (o===0){ raw = (ev.gamma ?? 0); }
-    else if (o===90){ raw = (ev.beta ?? 0); }           // 横(右)でbeta使用
-    else if (o===-90 || o===270){ raw = -(ev.beta ?? 0);} // 横(左)
-    else if (o===180){ raw = -(ev.gamma ?? 0); }
-    return raw;
-  }
-  function onOrient(ev){
-    if (!state.hasStarted) return;
-    const raw = mapToTilt(ev);
-    if (state.baseAngle===null){ state.baseAngle = raw; } // 自動ゼロ点
-    const ang = raw - state.baseAngle;
-    setAngle(ang);
-    el.dbg.textContent = `sensor:${state.useDevice?'on':'off'} | raw:${raw.toFixed(1)} | orient:${orientationAngle()}`;
-  }
-  function onMotion(ev){
-    if (!state.capOpen) return;
-    const a = ev.accelerationIncludingGravity || ev.acceleration || {x:0,y:0,z:0};
-    const mag = Math.hypot(a.x||0,a.y||0,a.z||0);
-    const now = performance.now();
-    if (mag>18 && (now - state.lastShake > 400)){ state.lastShake = now; jiggle(); sfx.sparkle.play(); }
-  }
-
-  /* ===== 傾きセット・注ぐ処理 ===== */
-  function setAngle(deg){
-    const max = Number(getCSS('--max-tilt'));
-    const clamped = Math.max(-max, Math.min(max, deg));
-    state.angle = clamped;
-    el.bottle.style.transform = `rotate(${clamped}deg)`;
-    el.angleText.textContent = clamped.toFixed(0);
-    el.tiltFill.style.width = `${50 + (clamped/max)*50}%`;
-    if (state.capOpen && Math.abs(clamped) >= Number(getCSS('--pour-threshold'))){ startPour(); } else { stopPour(); }
-  }
-  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace('deg',''); }
-
-  let lastPourTs=0;
-  function pourTick(ts){
-    if (!state.pouring) return;
-    if (!lastPourTs) lastPourTs=ts;
-    const dt=(ts-lastPourTs)/1000; lastPourTs=ts;
-    const beyond=Math.max(0,Math.abs(state.angle)-Number(getCSS('--pour-threshold')));
-    const rate = 0.25 + beyond/120;
-    state.level = Math.max(0, state.level - rate*dt);
-    updateLiquid();
-    if (state.level <= Number(getCSS('--level-min'))){ state.level = 0; updateLiquid(); stopPour(); flash('空になったよ。リセットで満たす'); }
-    else { state.rafId=requestAnimationFrame(pourTick); }
+  function pourLoop(t){
+    if(!S.pouring) return;
+    S.level = Math.max(0, S.level - 0.3/60); // 固定レートで減る（簡易版）
+    const pct = Math.max(0, Math.min(1, S.level));
+    const baseY=460, maxH=220, h=maxH*pct, y=baseY-h;
+    el.liq.setAttribute('y',y.toFixed(1));
+    el.liq.setAttribute('height',h.toFixed(1));
+    el.surf.setAttribute('cy',(y-2).toFixed(1));
+    if (S.level<=.02){ S.level=0; stopPour(); }
+    else { S.raf = requestAnimationFrame(pourLoop); }
   }
   function startPour(){
-    if (state.level<=0) return;
-    if (!state.pouring){
-      state.pouring=true; el.pourState.textContent='ON'; el.stream.classList.add('on'); el.bottle.classList.add('pouring'); sfx.pour.play();
-      lastPourTs=0; state.rafId=requestAnimationFrame(pourTick);
-    }
-    el.stream.style.height = (Math.min(70,8+Math.abs(state.angle))*4)+'px';
+    if(S.level<=0) return;
+    if(!S.pouring){ S.pouring=true; el.pour.textContent='ON'; el.stream.classList.add('on'); S.raf=requestAnimationFrame(pourLoop); }
+    el.stream.style.height = (Math.min(70, 8 + Math.abs(S.angle))*4)+'px';
   }
   function stopPour(){
-    if (state.pouring){
-      state.pouring=false; el.pourState.textContent='OFF'; el.stream.classList.remove('on'); el.stream.style.height='0px'; el.bottle.classList.remove('pouring'); sfx.pour.stop();
-      if (state.rafId) cancelAnimationFrame(state.rafId); state.rafId=null;
-    }
+    if(S.pouring){ S.pouring=false; el.pour.textContent='OFF'; el.stream.classList.remove('on'); el.stream.style.height='0'; cancelAnimationFrame(S.raf); S.raf=null; }
   }
-  function updateLiquid(){
-    const pct=Math.max(0,Math.min(1,state.level)); const baseY=460, maxH=220, h=maxH*pct, y=baseY-h;
-    el.liquidRect.setAttribute('y',y.toFixed(1)); el.liquidRect.setAttribute('height',h.toFixed(1)); el.liquidSurface.setAttribute('cy',(y-2).toFixed(1));
-    el.levelText.textContent=Math.round(pct*100);
+  function reset(){ S.level=1; stopPour(); setAngle(0); }
+
+  // スライダーで必ず動く
+  function drag(e){
+    const r = el.bar.getBoundingClientRect();
+    const x = (e.touches? e.touches[0].clientX: e.clientX) - r.left;
+    const ratio = Math.max(0, Math.min(1, x/r.width));
+    const ang = (ratio - .5) * 120; // -60..60
+    setAngle(ang);
   }
-  function jiggle(){
-    el.bottle.style.setProperty('--rot',(el.bottle.style.transform.match(/rotate\((-?\d+\.?\d*)deg\)/)?.[1]||0)+'deg');
-    el.bottle.classList.remove('jiggle'); void el.bottle.offsetWidth; el.bottle.classList.add('jiggle');
-    document.querySelectorAll('.sparkle').forEach((sp,i)=>{ sp.classList.remove('show'); void sp.offsetWidth; setTimeout(()=>sp.classList.add('show'), i*80); });
-  }
-  function flash(msg){ if(!el.tip) return; el.tip.textContent=msg; el.tip.style.opacity='1'; clearTimeout(el.tip._t); el.tip._t=setTimeout(()=>{el.tip.style.opacity='.0';},2600); }
+  el.bar.addEventListener('mousedown', (e)=>{ drag(e); window.addEventListener('mousemove', drag); });
+  window.addEventListener('mouseup', ()=> window.removeEventListener('mousemove', drag));
+  el.bar.addEventListener('touchstart', (e)=>{ drag(e); }, {passive:false});
+  el.bar.addEventListener('touchmove', (e)=>{ drag(e); }, {passive:false});
 
-  /* ===== 入力バインド ===== */
-  function bind(){
-    // センサー
-    window.addEventListener('deviceorientation', onOrient);
-    window.addEventListener('devicemotion', onMotion);
-    // 指ドラッグで傾き
-    const drag = (e)=>{
-      const r = el.tiltBar.getBoundingClientRect();
-      const x = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
-      const ratio = Math.max(0, Math.min(1, x/r.width));
-      el.tiltFill.style.width = (ratio*100)+'%';
-      const ang = (ratio - .5) * 2 * Number(getCSS('--max-tilt'));
-      setAngle(ang);
-    };
-    el.tiltBar.addEventListener('mousedown', (e)=>{ drag(e); window.addEventListener('mousemove', drag); });
-    window.addEventListener('mouseup', ()=> window.removeEventListener('mousemove', drag));
-    el.tiltBar.addEventListener('touchstart', (e)=>{ drag(e); }, {passive:false});
-    el.tiltBar.addEventListener('touchmove', (e)=>{ drag(e); }, {passive:false});
-
-    // ボタン
-    el.cap.addEventListener('click', toggleCap);
-    el.btnToggle.addEventListener('click', toggleCap);
-    el.btnShake.addEventListener('click', ()=>{ if(state.capOpen){ jiggle(); sfx.sparkle.play(); }});
-    el.btnZero.addEventListener('click', ()=>{ state.baseAngle=null; flash('ゼロ点を取り直したよ'); });
-    el.btnReset.addEventListener('click', resetAll);
-
-    // キー
-    window.addEventListener('keydown', (e)=>{
-      if(e.key==='ArrowLeft') setAngle(state.angle-4);
-      if(e.key==='ArrowRight') setAngle(state.angle+4);
-      if(e.key.toLowerCase()==='s'){ if(state.capOpen){ jiggle(); sfx.sparkle.play(); } }
-      if(e.key.toLowerCase()==='r'){ resetAll(); }
-      if(e.key.toLowerCase()==='z'){ state.baseAngle=null; }
-    });
-  }
-
+  // キャップ＆ボタン
   function toggleCap(){
-    state.capOpen = !state.capOpen;
-    if (state.capOpen){ el.cap.classList.remove('closed'); el.cap.classList.add('open'); sfx.pop.play(); }
-    else { el.cap.classList.remove('open'); el.cap.classList.add('closed'); stopPour(); }
+    S.capOpen = !S.capOpen;
+    if (S.capOpen) el.cap.classList.add('open'); else el.cap.classList.remove('open');
+    if (!S.capOpen) stopPour();
   }
+  el.cap.addEventListener('click', toggleCap);
+  el.btnToggle.addEventListener('click', toggleCap);
+  el.btnShake.addEventListener('click', ()=> el.bottle.classList.add('jiggle') && setTimeout(()=> el.bottle.classList.remove('jiggle'), 500));
+  el.btnReset.addEventListener('click', reset);
 
-  function resetAll(){
-    state.level=1; updateLiquid();
-    state.capOpen=false; stopPour(); el.cap.classList.remove('open'); el.cap.classList.add('closed');
-    state.baseAngle=null; setAngle(0); flash('リセットしたよ');
-  }
-
-  // 初期
-  updateLiquid(); setAngle(0);
+  // 初期表示
+  setAngle(0);
 })();
 </script>
 </body>
